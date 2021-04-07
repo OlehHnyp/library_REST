@@ -3,10 +3,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import models, IntegrityError
 from django.db.utils import DataError
-from django.utils import timezone
-import pytz
-import datetime
-import re
+
 ROLE_CHOICES = (
     (0, 'visitor'),
     (1, 'admin'),
@@ -38,16 +35,19 @@ class CustomUser(AbstractBaseUser):
         type updated_at: bool
 
     """
-    first_name = models.CharField(max_length=20, default='')
-    last_name = models.CharField(max_length=20, default='')
-    middle_name = models.CharField(max_length=20, default='')
-    email = models.CharField(
-        max_length=100, unique=True, default='')
-    password = models.CharField(max_length=255, default='')
-    created_at = models.DateTimeField(auto_now_add=True)
+
+    first_name = models.CharField(blank=True, max_length=20)
+    middle_name = models.CharField(blank=True, max_length=20)
+    last_name = models.CharField(blank=True, max_length=20)
+    email = models.EmailField(max_length=100, unique=True, validators=[validate_email])
+    password = models.CharField(max_length=128)
     updated_at = models.DateTimeField(auto_now=True)
-    role = models.IntegerField(choices=ROLE_CHOICES, default=0)
+    created_at = models.DateTimeField(auto_now_add=True, editable=False)
+    role = models.IntegerField(default=0, choices=ROLE_CHOICES)
     is_active = models.BooleanField(default=False)
+
+    USERNAME_FIELD = 'email'
+    objects = BaseUserManager()
 
     def __str__(self):
         """
@@ -56,36 +56,30 @@ class CustomUser(AbstractBaseUser):
                  user email, user password, user updated_at, user created_at,
                  user role, user is_active
         """
-        info = [f"'id': {self.id}",
-                f"'first_name': '{self.first_name}'",
-                f"'middle_name': '{self.middle_name}'",
-                f"'last_name': '{self.last_name}'",
-                f"'email': '{self.email}'",
-                f"'created_at': {int(self.created_at.timestamp())}",
-                f"'updated_at': {int(self.updated_at.timestamp())}",
-                f"'role': {self.role}",
-                f"'is_active': {self.is_active}"]
-        return ', '.join(info)
+        # return str(self.to_dict())[1:-1]
+        return self.first_name + ' ' + self.last_name
 
     def __repr__(self):
         """
         This magic method is redefined to show class and id of CustomUser object.
         :return: class, id
         """
-        return f"{self.__class__.__name__}(id={self.id})"
+        return f'{self.__class__.__name__}(id={self.id})'
 
-    @ staticmethod
+    @staticmethod
     def get_by_id(user_id):
         """
         :param user_id: SERIAL: the id of a user to be found in the DB
         :return: user object or None if a user with such ID does not exist
         """
         try:
-            return CustomUser.objects.get(id=user_id)
+            user = CustomUser.objects.get(id=user_id)
+            return user
         except CustomUser.DoesNotExist:
             pass
+            # LOGGER.error("User does not exist")
 
-    @ staticmethod
+    @staticmethod
     def get_by_email(email):
         """
         Returns user by email
@@ -94,24 +88,30 @@ class CustomUser(AbstractBaseUser):
         :return: user object or None if a user with such ID does not exist
         """
         try:
-            return CustomUser.objects.get(email=email)
+            user = CustomUser.objects.get(email=email)
+            return user
         except CustomUser.DoesNotExist:
+            # LOGGER.error("User does not exist")
             pass
 
-    @ staticmethod
+    @staticmethod
     def delete_by_id(user_id):
         """
         :param user_id: an id of a user to be deleted
         :type user_id: int
         :return: True if object existed in the db and was removed or False if it didn't exist
         """
+
         try:
-            CustomUser.objects.get(id=user_id).delete()
+            user = CustomUser.objects.get(id=user_id)
+            user.delete()
             return True
         except CustomUser.DoesNotExist:
-            return False
+            # LOGGER.error("User does not exist")
+            pass
+        return False
 
-    @ staticmethod
+    @staticmethod
     def create(email, password, first_name=None, middle_name=None, last_name=None):
         """
         :param first_name: first name of a user
@@ -126,19 +126,21 @@ class CustomUser(AbstractBaseUser):
         :type password: str
         :return: a new user object which is also written into the DB
         """
-        pattern = r"^[A-Za-z0-9]+[A-Za-z0-9!#$%&'*+\-\/=?^_`{|}~]+(\.[A-z0-9!#$%&'*+\-\/=?^_`{|}~]+)*@[a-z]+(\.[a-z]+)+"
-        if (0 < len(email) < 21 and
-            re.fullmatch(pattern, email) and not
-            CustomUser.get_by_email(email) and
-            len(first_name) < 21 and
-            len(last_name) < 21 and
-                len(middle_name) < 21):
-
-            user = CustomUser(email=email, password=password, first_name=first_name,
-                              middle_name=middle_name, last_name=last_name,)
+        # print(validate_email("96mail.com"))
+        data = {}
+        data['first_name'] = first_name if first_name else ''
+        data['last_name'] = last_name if last_name else ''
+        data['middle_name'] = middle_name if middle_name else ''
+        data['email'] = email
+        user = CustomUser(**data)
+        user.set_password(password)
+        try:
+            validate_email(user.email)
             user.save()
-            print(user.middle_name)
             return user
+        except (IntegrityError, AttributeError, ValidationError, DataError):
+            # LOGGER.error("Wrong attributes or relational integrity error")
+            pass
 
     def to_dict(self):
         """
@@ -157,7 +159,8 @@ class CustomUser(AbstractBaseUser):
         |   'is_active:' True
         | }
         """
-        info_dict = {
+
+        return {
             'id': self.id,
             'first_name': self.first_name,
             'middle_name': self.middle_name,
@@ -166,9 +169,7 @@ class CustomUser(AbstractBaseUser):
             'created_at': int(self.created_at.timestamp()),
             'updated_at': int(self.updated_at.timestamp()),
             'role': self.role,
-            'is_active': self.is_active
-        }
-        return info_dict
+            'is_active': self.is_active}
 
     def update(self,
                first_name=None,
@@ -194,26 +195,27 @@ class CustomUser(AbstractBaseUser):
         :return: None
         """
 
-        if first_name and len(first_name) < 21:
+        if first_name:
             self.first_name = first_name
-        if last_name and len(last_name) < 21:
+        if last_name:
             self.last_name = last_name
-        if middle_name and len(middle_name) < 21:
+        if middle_name:
             self.middle_name = middle_name
         if password:
-            self.password = password
+            self.set_password(password)
         if role:
             self.role = role
-        if is_active:
+        if is_active is not None:
             self.is_active = is_active
         self.save()
 
-    @ staticmethod
+    @staticmethod
     def get_all():
         """
         returns data for json request with QuerySet of all users
         """
-        return CustomUser.objects.all()
+        all_users = CustomUser.objects.all()
+        return all_users
 
     def get_role_name(self):
         """

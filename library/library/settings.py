@@ -160,3 +160,5 @@ try:
     from .local_settings import *
 except ImportError:
     pass
+
+AUTH_USER_MODEL = 'authentication.CustomUser'

@@ -18,24 +18,24 @@ class Book(models.Model):
         type authors: list->Author
     """
 
-    name = models.CharField(max_length=128,  default='')
-    description = models.CharField(max_length=200,  default='')
+    name = models.CharField(blank=True, max_length=128)
+    description = models.TextField(blank=True)
     count = models.IntegerField(default=10)
-    authors = models.ManyToManyField("author.Author", related_name="books")
+    authors = models.ManyToManyField(Author, related_name='books')
 
     def __str__(self):
         """
         Magic method is redefined to show all information about Book.
         :return: book id, book name, book description, book count, book authors
         """
-        return f"'id': {self.id}, 'name': '{self.name}', 'description': '{self.description}', 'count': {self.count}, 'authors': [{self.authors.get(id=self.id).id}]"
+        return str(self.to_dict())[1:-1]
 
     def __repr__(self):
         """
         This magic method is redefined to show class and id of Book object.
         :return: class, id
         """
-        return f"{__class__.__name__}(id={self.id})"
+        return f'{self.__class__.__name__}(id={self.id})'
 
     @staticmethod
     def get_by_id(book_id):
@@ -44,9 +44,11 @@ class Book(models.Model):
         :return: book object or None if a book with such ID does not exist
         """
         try:
-            return Book.objects.get(id=book_id)
+            user = Book.objects.get(id=book_id)
+            return user
         except Book.DoesNotExist:
             pass
+            # LOGGER.error("User does not exist")
 
     @staticmethod
     def delete_by_id(book_id):
@@ -55,11 +57,15 @@ class Book(models.Model):
         :type book_id: int
         :return: True if object existed in the db and was removed or False if it didn't exist
         """
+
         try:
-            Book.objects.get(id=book_id).delete()
+            book = Book.objects.get(id=book_id)
+            book.delete()
             return True
         except Book.DoesNotExist:
-            return False
+            # LOGGER.error("User does not exist")
+            pass
+        return False
 
     @staticmethod
     def create(name, description, count=10, authors=None):
@@ -74,13 +80,17 @@ class Book(models.Model):
         type authors: list->Author
         :return: a new book object which is also written into the DB
         """
-        if len(name) < 129 and len(description) < 129:
-            b = Book(name=name, description=description,
-                     count=count)
-            b.save()
-            if authors:
-                b.authors.set(authors)
-            return b
+        book = Book(name=name, description=description, count=count)
+        try:
+            book.save()
+            if authors is not None:
+                for author in authors:
+                    book.authors.add(author)
+            book.save()
+            return book
+        except (IntegrityError, AttributeError, DataError):
+            # LOGGER.error("Wrong attributes or relational integrity error")
+            pass
 
     def to_dict(self):
         """
@@ -94,14 +104,14 @@ class Book(models.Model):
         |   'authors': []
         | }
         """
-        info_dict = {
+
+        return {
             'id': self.id,
             'name': self.name,
             'description': self.description,
             'count': self.count,
-            'authors': list(self.authors.all())
+            'authors': [author.id for author in self.authors.all()]
         }
-        return info_dict
 
     def update(self, name=None, description=None, count=None):
         """
@@ -114,17 +124,14 @@ class Book(models.Model):
         type count: int default=10
         :return: None
         """
-        if len(name) >= 128:
-            raise DataError
+
         if name:
             self.name = name
-            self.save()
         if description:
             self.description = description
-            self.save()
         if count:
             self.count = count
-            self.save()
+        self.save()
 
     def add_authors(self, authors):
         """
@@ -132,7 +139,10 @@ class Book(models.Model):
         param authors: list authors
         :return: None
         """
-        self.authors.add(*[x.id for x in authors])
+
+        for author in authors:
+            self.authors.add(author)
+        self.save()
 
     def remove_authors(self, authors):
         """
@@ -140,11 +150,14 @@ class Book(models.Model):
         param authors: list authors
         :return: None
         """
-        self.authors.remove(*[x.id for x in authors])
+        for author in authors:
+            self.authors.remove(author)
+        self.save()
 
     @staticmethod
     def get_all():
         """
         returns data for json request with QuerySet of all books
         """
-        return list(Book.objects.all())
+        all_users = Book.objects.all()
+        return list(all_users)

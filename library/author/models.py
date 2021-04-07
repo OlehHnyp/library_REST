@@ -14,23 +14,24 @@ class Author(models.Model):
         type patronymic: str max_length=20
 
     """
-    name = models.CharField(max_length=20, default='')
-    surname = models.CharField(max_length=20, default='')
-    patronymic = models.CharField(max_length=20, default='')
+
+    name = models.CharField(blank=True, max_length=20)
+    surname = models.CharField(blank=True, max_length=20)
+    patronymic = models.CharField(blank=True, max_length=20)
 
     def __str__(self):
         """
         Magic method is redefined to show all information about Author.
         :return: author id, author name, author surname, author patronymic
         """
-        return f"'id': {self.id}, 'name': '{self.name}', 'surname': '{self.surname}', 'patronymic': '{self.patronymic}'"
+        return str(self.to_dict())[1:-1]
 
     def __repr__(self):
         """
         This magic method is redefined to show class and id of Author object.
         :return: class, id
         """
-        return f"{self.__class__.__name__}(id={self.id})"
+        return f'{self.__class__.__name__}(id={self.id})'
 
     @staticmethod
     def get_by_id(author_id):
@@ -39,9 +40,11 @@ class Author(models.Model):
         :return: author object or None if a user with such ID does not exist
         """
         try:
-            return Author.objects.get(id=author_id)
+            user = Author.objects.get(id=author_id)
+            return user
         except Author.DoesNotExist:
             pass
+            # LOGGER.error("User does not exist")
 
     @staticmethod
     def delete_by_id(author_id):
@@ -50,11 +53,15 @@ class Author(models.Model):
         :type author_id: int
         :return: True if object existed in the db and was removed or False if it didn't exist
         """
+
         try:
-            Author.objects.get(id=author_id).delete()
-            return True
+            author = Author.objects.get(id=author_id)
+            author.delete()
+            return author
         except Author.DoesNotExist:
-            return False
+            # LOGGER.error("User does not exist")
+            pass
+        return False
 
     @staticmethod
     def create(name, surname, patronymic):
@@ -67,11 +74,13 @@ class Author(models.Model):
         type patronymic: str max_length=20
         :return: a new author object which is also written into the DB
         """
-        if len(name) < 21 and len(surname) < 21 and len(patronymic) < 21:
-            new_author = Author(
-                id=1, name=name, surname=surname, patronymic=patronymic)
-            new_author.save()
-            return new_author
+        author = Author(name=name, surname=surname, patronymic=patronymic)
+        try:
+            author.save()
+            return author
+        except (IntegrityError, AttributeError, DataError):
+            # LOGGER.error("Wrong attributes or relational integrity error")
+            pass
 
     def to_dict(self):
         """
@@ -84,13 +93,13 @@ class Author(models.Model):
         |   'patronymic': 'ln',
         | }
         """
-        data = {
-            "id": self.id,
-            "name": self.name,
-            "surname": self.surname,
-            "patronymic": self.patronymic
+
+        return {
+            'id': self.id,
+            'name': self.name,
+            'surname': self.surname,
+            'patronymic': self.patronymic
         }
-        return data
 
     def update(self,
                name=None,
@@ -106,17 +115,24 @@ class Author(models.Model):
         type patronymic: str max_length=20
         :return: None
         """
-        if name and len(name) < 21:
+
+        if name:
             self.name = name
-        if surname and len(surname) < 21:
+        if surname:
             self.surname = surname
-        if patronymic and len(patronymic) < 21:
+        if patronymic:
             self.patronymic = patronymic
-        self.save()
+        try:
+            from django.db import transaction
+            with transaction.atomic():
+                self.save()
+        except:
+            pass
 
     @staticmethod
     def get_all():
         """
         returns data for json request with QuerySet of all authors
         """
-        return Author.objects.all()
+        all_users = Author.objects.all()
+        return all_users
