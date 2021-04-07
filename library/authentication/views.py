@@ -10,6 +10,7 @@ from rest_framework.response import Response
 from book.models import Book
 from datetime import timedelta
 from django.utils import timezone
+from order.models import Order
 
 
 class CustomUserCreateView(generics.CreateAPIView):
@@ -18,12 +19,13 @@ class CustomUserCreateView(generics.CreateAPIView):
 
 class CustomUserAdminCreateView(generics.CreateAPIView):
     serializer_class = CustomUserAdminDetailSerializer
-    permission_classes = (IsAuthenticated,partial(AdminOnly, ['GET', "POST"]),)
+    permission_classes = (IsAuthenticated, partial(
+        AdminOnly, ['GET', "POST"]),)
 
 
 class CustomUserListView(generics.ListAPIView):
     serializer_class = CustomUserDetailSerializer
-    queryset = CustomUser.objects.all()
+    queryset = CustomUser.objects.all().order_by('-created_at')
     permission_classes = (IsAuthenticated, partial(AdminOnly, ['GET']),)
 
 
@@ -49,3 +51,12 @@ class CustomUserOrderCreateView(generics.CreateAPIView):
         book.save()
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class CustomUserOrderListView(generics.ListAPIView):
+    serializer_class = CustomUserOrderDetailSerializer
+    permission_classes = (IsAuthenticated,)
+
+    def get_queryset(self):
+        user = self.request.user
+        return Order.objects.filter(user=user).order_by('-created_at')

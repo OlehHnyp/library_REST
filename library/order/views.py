@@ -12,7 +12,7 @@ from rest_framework.permissions import IsAuthenticated
 
 class OrderListView(generics.ListAPIView):
     serializer_class = OrderDetailSerializer
-    queryset = Order.objects.all()
+    queryset = Order.objects.all().order_by('-created_at')
     permission_classes = (IsAuthenticated, partial(AdminOnly, ['GET', ]),)
 
 
