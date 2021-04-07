@@ -1,5 +1,5 @@
 from rest_framework import permissions
-from functools import partial
+import re
 
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
@@ -17,3 +17,15 @@ class AdminOnly(permissions.BasePermission):
 
     def has_permission(self, request, view):
         return request.method in self.allowed_methods and request.user.role
+
+
+class SelfOnlyOrder(permissions.BasePermission):
+
+    def __init__(self, allowed_methods):
+        super().__init__()
+        self.allowed_methods = allowed_methods
+
+    def has_permission(self, request, view):
+        if re.search(fr"{request.user.id}+(?=\/order\/)", request.path):
+            return request.method in self.allowed_methods
+        return False

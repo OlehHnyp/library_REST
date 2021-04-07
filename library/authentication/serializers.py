@@ -2,6 +2,9 @@ from rest_framework import serializers
 from .models import CustomUser
 from django.contrib.auth.hashers import make_password
 from .permissions import IsOwnerOrReadOnly, AdminOnly
+from order.models import Order
+from datetime import timedelta
+from django.utils import timezone
 
 
 class CustomUserAdminDetailSerializer(serializers.ModelSerializer):
@@ -47,3 +50,12 @@ class CustomUserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = CustomUser
         fields = '__all__'
+
+
+class CustomUserOrderDetailSerializer(serializers.ModelSerializer):
+    end_at = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = Order
+        read_only_fields = ('user', 'plated_end_at')
+        fields = ('__all__')

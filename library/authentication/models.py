@@ -3,7 +3,6 @@ from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import models, IntegrityError
 from django.db.utils import DataError
-
 ROLE_CHOICES = (
     (0, 'visitor'),
     (1, 'admin'),
@@ -39,13 +38,13 @@ class CustomUser(AbstractBaseUser):
     first_name = models.CharField(blank=True, max_length=20)
     middle_name = models.CharField(blank=True, max_length=20)
     last_name = models.CharField(blank=True, max_length=20)
-    email = models.EmailField(max_length=100, unique=True, validators=[validate_email])
+    email = models.EmailField(
+        max_length=100, unique=True, validators=[validate_email])
     password = models.CharField(max_length=128)
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True, editable=False)
     role = models.IntegerField(default=0, choices=ROLE_CHOICES)
     is_active = models.BooleanField(default=False)
-
     USERNAME_FIELD = 'email'
     objects = BaseUserManager()
 
