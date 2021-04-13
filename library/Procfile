@@ -1,2 +1,2 @@
 web: gunicorn library.wsgi --log-file -
-web: python library/manage.py runserver 0.0.0.0:$PORT
+web: python library/manage.py runserver 0.0.0.0:$PORT --noreload
