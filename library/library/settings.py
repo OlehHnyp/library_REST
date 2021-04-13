@@ -166,4 +166,4 @@ except ImportError:
 
 AUTH_USER_MODEL = 'authentication.CustomUser'
 
-django_heroku.settings(locals())
+# django_heroku.settings(locals())
